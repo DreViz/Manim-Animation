@@ -1,0 +1,340 @@
+# ========== BASIC SHAPES ==========
+
+# Example 1: Draw a Circle
+# Create a simple circle at the center of the screen.
+from manim import *
+
+class DrawCircle(Scene):
+    def construct(self):
+        circle = Circle()
+        self.play(Create(circle))
+        self.wait()
+
+# Example 2: Draw a Square
+# Create a square at the center of the screen.
+class DrawSquare(Scene):
+    def construct(self):
+        square = Square()
+        self.play(Create(square))
+        self.wait()
+
+# Example 3: Draw a Triangle
+# Construct a triangle using three points.
+class DrawTriangle(Scene):
+    def construct(self):
+        triangle = Polygon(LEFT, UP, RIGHT)
+        self.play(Create(triangle))
+        self.wait()
+
+# ========== FILLED SHAPES ==========
+
+# Example 4: Draw and Fill a Circle
+# Draw a circle with red fill and 50% opacity.
+class FillCircle(Scene):
+    def construct(self):
+        circle = Circle()
+        circle.set_fill(RED, opacity=0.5)
+        self.play(Create(circle))
+        self.wait()
+
+# Example 5: Draw and Fill a Square
+# Draw a square with blue fill and 50% opacity.
+class FillSquare(Scene):
+    def construct(self):
+        square = Square()
+        square.set_fill(BLUE, opacity=0.5)
+        self.play(Create(square))
+        self.wait()
+
+# Example 6: Draw and Fill a Triangle
+# Draw a triangle with green fill and 50% opacity.
+class FillTriangle(Scene):
+    def construct(self):
+        triangle = Polygon(LEFT, UP, RIGHT)
+        triangle.set_fill(GREEN, opacity=0.5)
+        self.play(Create(triangle))
+        self.wait()
+
+# ========== BASIC TRANSFORMATIONS ==========
+
+# Example 7: Moving and Transforming a Square
+# Demonstrates shifting, color change, scaling, and rotation.
+class MovingAround(Scene):
+    def construct(self):
+        square = Square(color=BLUE, fill_opacity=1)
+        self.play(square.animate.shift(LEFT))
+        self.play(square.animate.set_fill(ORANGE))
+        self.play(square.animate.scale(0.3))
+        self.play(square.animate.rotate(0.4))
+
+# ========== DYNAMIC ANGLES ==========
+
+# Example 8: Moving Angle with Updaters
+# Dynamically updates an angle and its label as a line rotates.
+class MovingAngle(Scene):
+    def construct(self):
+        rotation_center = LEFT
+        theta_tracker = ValueTracker(110)
+
+        line1 = Line(LEFT, RIGHT)
+        line_moving = Line(LEFT, RIGHT)
+        line_ref = line_moving.copy()
+
+        line_moving.rotate(theta_tracker.get_value() * DEGREES, about_point=rotation_center)
+
+        a = Angle(line1, line_moving, radius=0.5)
+        tex = MathTex(r"\theta").move_to(
+            Angle(line1, line_moving, radius=0.5 + 3 * SMALL_BUFF).point_from_proportion(0.5)
+        )
+
+        self.add(line1, line_moving, a, tex)
+        self.wait()
+
+        # Updaters for dynamic animation
+        line_moving.add_updater(
+            lambda x: x.become(line_ref.copy()).rotate(
+                theta_tracker.get_value() * DEGREES, about_point=rotation_center
+            )
+        )
+        a.add_updater(lambda x: x.become(Angle(line1, line_moving, radius=0.5)))
+        tex.add_updater(lambda x: x.move_to(
+            Angle(line1, line_moving, radius=0.5 + 3 * SMALL_BUFF).point_from_proportion(0.5)
+        ))
+
+        self.play(theta_tracker.animate.set_value(40))
+        self.play(theta_tracker.animate.increment_value(140))
+        self.play(tex.animate.set_color(RED), run_time=0.5)
+        self.play(theta_tracker.animate.set_value(350))
+
+# ========== TRACKING POINTS ==========
+
+# Example 9: Tracking a Moving Dot
+# Attach a label to a moving dot using updaters.
+class TrackMovingDot(Scene):
+    def construct(self):
+        dot = Dot()
+        label = Text("Dot").next_to(dot, UP)
+        label.add_updater(lambda m: m.next_to(dot, UP))
+        self.add(dot, label)
+        self.play(dot.animate.shift(RIGHT * 4), run_time=2)
+        self.wait()
+
+# ========== TEXT AND MATH ==========
+
+# Example 10: Displaying Text
+# Show plain text and mathematical expressions.
+class ShowText(Scene):
+    def construct(self):
+        text = Text("Hello, Manim!")
+        math = MathTex(r"E=mc^2")
+        group = VGroup(text, math).arrange(DOWN)
+        self.play(Write(group))
+        self.wait()
+
+# ========== IMAGES ==========
+
+# Example 11: Displaying an Image
+# Import and display an image file (ensure the path is correct).
+class ShowImage(Scene):
+    def construct(self):
+        img = ImageMobject("example.png")  # Replace with your image path
+        img.scale(0.5)
+        self.play(FadeIn(img))
+        self.wait()
+
+# ========== GRAPHS AND AXES ==========
+
+# Example 12: Plotting a Function
+# Plot y = sin(x) on axes.
+class PlotFunction(Scene):
+    def construct(self):
+        axes = Axes(
+            x_range=[-3, 3],
+            y_range=[-1.5, 1.5],
+            axis_config={"color": BLUE},
+        )
+        graph = axes.plot(lambda x: np.sin(x), color=RED)
+        self.play(Create(axes), Create(graph))
+        self.wait()
+
+# ========== GROUPING AND ARRANGEMENT ==========
+
+# Example 13: Arranging Multiple Objects
+# Arrange shapes in a row and animate them together.
+class ArrangeShapes(Scene):
+    def construct(self):
+        c = Circle().set_color(RED)
+        s = Square().set_color(GREEN)
+        t = Triangle().set_color(BLUE)
+        group = VGroup(c, s, t).arrange(RIGHT, buff=0.5)
+        self.play(FadeIn(group))
+        self.wait()
+
+# ========== VALUE TRACKERS AND UPDATERS ==========
+
+# Example 14: Animate Value Change with ValueTracker
+# Animate a number changing from 0 to 10.
+class AnimateValue(Scene):
+    def construct(self):
+        tracker = ValueTracker(0)
+        number = DecimalNumber(tracker.get_value())
+        number.add_updater(lambda m: m.set_value(tracker.get_value()))
+        self.add(number)
+        self.play(tracker.animate.set_value(10), run_time=2)
+        self.wait()
+
+# ========== 3D SCENES ========== 
+
+# Example 15: ThreeDLightSourcePosition
+# Adjust the 3D light source position in a scene.
+from manim import *
+
+class ThreeDLightSourcePosition(ThreeDScene):
+    def construct(self):
+        axes = ThreeDAxes()
+        sphere = Surface(
+            lambda u, v: np.array([
+                1.5 * np.cos(u) * np.cos(v),
+                1.5 * np.cos(u) * np.sin(v),
+                1.5 * np.sin(u)
+            ]), v_range=[0, TAU], u_range=[-PI / 2, PI / 2],
+            checkerboard_colors=[RED_D, RED_E], resolution=(15, 32)
+        )
+        self.renderer.camera.light_source.move_to(3 * IN)
+        self.set_camera_orientation(phi=75 * DEGREES, theta=30 * DEGREES)
+        self.add(axes, sphere)
+
+# Example 16: ThreeDCameraRotation
+# Animate the camera orbiting around 3D objects.
+class ThreeDCameraRotation(ThreeDScene):
+    def construct(self):
+        axes = ThreeDAxes()
+        circle = Circle()
+        self.set_camera_orientation(phi=75 * DEGREES, theta=30 * DEGREES)
+        self.add(circle, axes)
+        self.begin_ambient_camera_rotation(rate=0.1)
+        self.wait()
+        self.stop_ambient_camera_rotation()
+        self.move_camera(phi=75 * DEGREES, theta=30 * DEGREES)
+        self.wait()
+
+# Example 17: ThreeDSurfacePlot
+# Visualize a 3D surface defined by a mathematical function.
+class ThreeDSurfacePlot(ThreeDScene):
+    def construct(self):
+        resolution_fa = 24
+        self.set_camera_orientation(phi=75 * DEGREES, theta=-30 * DEGREES)
+
+        def param_gauss(u, v):
+            x = u
+            y = v
+            sigma, mu = 0.4, [0.0, 0.0]
+            d = np.linalg.norm(np.array([x - mu[0], y - mu[1]]))
+            z = np.exp(-(d ** 2 / (2.0 * sigma ** 2)))
+            return np.array([x, y, z])
+
+        gauss_plane = Surface(
+            param_gauss,
+            resolution=(resolution_fa, resolution_fa),
+            v_range=[-2, +2],
+            u_range=[-2, +2]
+        )
+
+        gauss_plane.scale(2, about_point=ORIGIN)
+        gauss_plane.set_style(fill_opacity=1, stroke_color=GREEN)
+        gauss_plane.set_fill_by_checkerboard(ORANGE, BLUE, opacity=0.5)
+        axes = ThreeDAxes()
+        self.add(axes, gauss_plane)
+
+# ========== BASIC TRANSFORMATIONS CONTINUED ==========
+
+# Example 18: CreateCircle (colored)
+# Draw a filled pink circle with 50% opacity.
+class CreateCircle(Scene):
+    def construct(self):
+        circle = Circle()
+        circle.set_fill(PINK, opacity=0.5)
+        self.play(Create(circle))
+
+# Example 19: SquareToCircle
+# Transform a rotated square into a filled circle.
+class SquareToCircle(Scene):
+    def construct(self):
+        circle = Circle()
+        circle.set_fill(PINK, opacity=0.5)
+        square = Square()
+        square.rotate(PI / 4)
+        self.play(Create(square))
+        self.play(Transform(square, circle))
+        self.play(FadeOut(square))
+
+# Example 20: AnimatedSquareToCircle
+# Use .animate syntax for step-by-step transformations.
+class AnimatedSquareToCircle(Scene):
+    def construct(self):
+        circle = Circle()
+        square = Square()
+        self.play(Create(square))
+        self.play(square.animate.rotate(PI / 4))
+        self.play(Transform(square, circle))
+        self.play(square.animate.set_fill(PINK, opacity=0.5))
+
+# Example 21: DifferentRotations
+# Compare .animate vs. functional animation methods for rotation.
+class DifferentRotations(Scene):
+    def construct(self):
+        left_square = Square(color=BLUE, fill_opacity=0.7).shift(2 * LEFT)
+        right_square = Square(color=GREEN, fill_opacity=0.7).shift(2 * RIGHT)
+        self.play(
+            left_square.animate.rotate(PI),
+            Rotate(right_square, angle=PI),
+            run_time=2
+        )
+        self.wait()
+
+# Example 22: TransformCycle
+# Repeatedly transform a shape from one to another.
+class TransformCycle(Scene):
+    def construct(self):
+        a = Circle()
+        t1 = Square()
+        t2 = Triangle()
+        self.add(a)
+        self.wait()
+        for t in [t1, t2]:
+            self.play(Transform(a, t))
+
+# ========== ADVANCED ANIMATION TIMING ==========
+
+# Example 23: Lagged Start Animation
+# Animate multiple objects with a lag between each.
+class LaggedStartExample(Scene):
+    def construct(self):
+        dots = VGroup(*[Dot().shift(RIGHT * i) for i in range(5)])
+        self.play(LaggedStart(*[FadeIn(dot) for dot in dots], lag_ratio=0.2))
+        self.wait()
+
+# Example 24: Wait and Pause
+# Demonstrate wait and pause in animations.
+class WaitPauseExample(Scene):
+    def construct(self):
+        square = Square()
+        self.play(Create(square))
+        self.wait(1)  # Wait for 1 second
+        self.play(square.animate.shift(RIGHT))
+        self.wait()   # Default wait (1 second)
+
+# ========== CAMERA MOVEMENT ==========
+
+# Example 25: Move Camera to Focus
+# Move the camera to focus on a specific object.
+class CameraFocusExample(Scene):
+    def construct(self):
+        square = Square().shift(LEFT * 2)
+        circle = Circle().shift(RIGHT * 2)
+        self.add(square, circle)
+        self.play(self.camera.frame.animate.move_to(circle))
+        self.wait()
+
+# ========== END OF SNIPPETS ==========
+
