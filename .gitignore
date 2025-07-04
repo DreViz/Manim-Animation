@@ -1,0 +1,51 @@
+# Node modules
+node_modules/
+frontend/node_modules/
+backend/node_modules/
+
+# Python virtual environments
+venv/
+backend/venv/
+
+# Build output
+dist/
+frontend/dist/
+backend/dist/
+dist-ssr/
+*.local
+
+# Vite/Tailwind cache
+.vite/
+.tailwind/
+
+# Environment files
+.env
+.env.*.local
+
+# Editor directories and files
+.vscode/
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS-specific files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# MacOS
+.AppleDouble
+.LSOverride
+
+# npm/yarn/pnpm lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Coverage reports
+coverage/
