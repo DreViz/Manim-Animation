@@ -17,6 +17,7 @@ export default function App() {
         type === "video"
           ? "/generate?type=video"
           : "/generate";
+      console.log("Sending request to:", endpoint, "with prompt:", prompt); // Debug log
       const res = await fetch(endpoint, {
         method: "POST",
         headers: {
@@ -24,6 +25,8 @@ export default function App() {
         },
         body: JSON.stringify({ prompt }),
       });
+
+      console.log("Response status:", res.status, "Content-Type:", res.headers.get("content-type")); // Debug log
 
       if (!res.ok) throw new Error("Server error");
 
