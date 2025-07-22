@@ -3,6 +3,8 @@ import os
 from inference import ask
 import re
 from datetime import datetime
+import traceback
+import sys
 
 def extract_code_block(text: str) -> str:
     """
@@ -11,7 +13,7 @@ def extract_code_block(text: str) -> str:
     code_blocks = re.findall(r"```(?:python)?\s*([\s\S]*?)```", text)
     if code_blocks:
         return code_blocks[0].strip()
-    return text.strip()  # fallback: return everything
+    return text.strip()  # faasdasdasdallback: return everything
 
 def is_valid_manim_code(code: str) -> bool:
     # Simple check: must contain at least one likely code line
@@ -52,7 +54,6 @@ def generate_video(prompt):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    # Generate unique filenames
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     script_filename = f"ai_scene_{timestamp}.py"
     output_filename = f"output_{timestamp}.mp4"
@@ -60,8 +61,9 @@ def generate_video(prompt):
     result = ask(prompt)
     code_inside_construct = extract_code_block(result)
     code_inside_construct = extract_construct_body(code_inside_construct)
+
     if not is_valid_manim_code(code_inside_construct):
-        print("Error: LLM did not return valid Manim code. Output was:\n", result)
+        print("Error: LLM did not return valid Manim code.")
         return
 
     write_manim_script(code_inside_construct, script_filename)
@@ -74,20 +76,28 @@ def generate_video(prompt):
             "AIAnimation",
             "--output_file", output_filename
         ], check=True)
-        # Move or rename the output video if needed
         src = f"media/videos/ai_scene/{timestamp}/480p15/{output_filename}"
         if os.path.exists(src):
             os.rename(src, output_filename)
         print(f"Video generated: {output_filename}")
     except subprocess.CalledProcessError as e:
         print("Error running Manim:", e)
+        traceback.print_exc()
+    except Exception as e:
+        print("Unexpected error:", e)
+        traceback.print_exc()
     finally:
-        # Clean up the generated script file
         if os.path.exists(script_filename):
             os.remove(script_filename)
 
 if __name__ == "__main__":
-    print('For best results, describe your animation. The system will prepend:\n'
-          '"Return only the Python code for the body of the construct method, no explanation or markdown."')
-    prompt = input("Enter your animation prompt: ")
+    print("[generate_video] Script started.")
+    if len(sys.argv) > 1:
+        print("[generate_video] Arguments provided:", sys.argv[1:])
+        prompt = " ".join(sys.argv[1:])
+    else:
+        print("[generate_video] No arguments provided.")
+        print('For best results, describe your animation. The system will prepend:\n'
+              '"Return only the Python code for the body of the construct method, no explanation or markdown."')
+        prompt = input("Enter your animation prompt: ")
     generate_video(prompt)

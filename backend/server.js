@@ -15,23 +15,25 @@ app.post("/generate", (req, res) => {
   const prompt = req.body.prompt;
   const isVideo = req.query.type === "video";
 
-  const command = isVideo ? "python generate_video.py" : "python inference.py";
+  const command = isVideo
+    ? `python generate_video.py ${JSON.stringify(prompt || "")}`
+    : `python inference.py ${JSON.stringify(prompt || "")}`;
 
-  exec(command, (error, stdout, stderr) => {
+  exec(command, { timeout: 60000, cwd: __dirname }, (error, stdout, stderr) => {
     if (error) {
-      console.error(`Error: ${error.message}`);
-      return res.status(500).json({ error: error.message });
-    }
-
-    if (stderr) {
-      console.error(`stderr: ${stderr}`);
-      return res.status(500).json({ error: stderr });
+      return res.status(500).json({ error: error.message, stderr });
     }
 
     if (isVideo) {
-      const videoPath = path.join(__dirname, "output.mp4");
-      if (fs.existsSync(videoPath)) {
-        res.sendFile(videoPath);
+      // Find the latest output_*.mp4 file
+      const files = fs.readdirSync(__dirname)
+        .filter(f => /^output_\d{8}_\d{6}\.mp4$/.test(f))
+        .sort()
+        .reverse();
+      const latestVideo = files.length > 0 ? path.join(__dirname, files[0]) : null;
+
+      if (latestVideo && fs.existsSync(latestVideo)) {
+        res.sendFile(latestVideo);
       } else {
         res.status(404).send("Video file not found.");
       }
@@ -44,3 +46,4 @@ app.post("/generate", (req, res) => {
 app.listen(PORT, () => {
   console.log(`Node.js API running at http://localhost:${PORT}`);
 });
+
