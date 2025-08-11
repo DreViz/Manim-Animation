@@ -1,3 +1,4 @@
+// server.js
 const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
@@ -15,7 +16,7 @@ app.post("/generate", (req, res) => {
   const prompt = req.body.prompt || "";
   const isVideo = req.query.type === "video";
 
-  // Use venv python explicitly for reliability
+  // Use the Python executable from the virtual environment for reliability
   const py = path.join(__dirname, "venv", "Scripts", "python.exe");
   const command = isVideo
     ? `"${py}" generate_video.py ${JSON.stringify(prompt)}`
@@ -28,75 +29,64 @@ app.post("/generate", (req, res) => {
   console.log("CWD (server):", __dirname);
   console.log("Command:", command);
 
-  exec(command, { timeout: 180000, cwd: __dirname }, (error, stdout, stderr) => {
+  // Increased timeout for potentially long video renders (5 minutes)
+  exec(command, { timeout: 300000, cwd: __dirname }, (error, stdout, stderr) => {
     console.log("---- Python STDOUT ----\n", stdout);
     console.log("---- Python STDERR ----\n", stderr);
 
+    // 1. Handle script execution error immediately.
+    // This catches errors from the Python script itself (e.g., syntax errors, crashes).
     if (error) {
       console.error("exec error:", error);
-      return res.status(500).json({ error: error.message, stderr });
+      // Always use return to stop further execution.
+      return res.status(500).json({ error: error.message, stderr: stderr });
     }
 
+    // 2. Handle the video generation success case.
     if (isVideo) {
-      let dirFiles = [];
+      // The python script moves the final .mp4 to the project root (__dirname).
+      // We will search there first as the primary location.
+      let latestVideoPath = null;
       try {
-        dirFiles = fs.readdirSync(__dirname);
+        const filesInRoot = fs.readdirSync(__dirname);
+        const videoCandidates = filesInRoot
+          .filter((f) => /^output_\d{8}_\d{6}\.mp4$/.test(f))
+          .sort()
+          .reverse();
+
+        if (videoCandidates.length > 0) {
+          latestVideoPath = path.join(__dirname, videoCandidates[0]);
+        }
       } catch (e) {
-        console.error("Failed to read __dirname:", e);
+        console.error("Error reading root directory:", e);
+        // Fallthrough to the final error response
       }
-      console.log("Files in __dirname after Python run:", dirFiles);
-
-      const candidates = dirFiles
-        .filter((f) => /^output_\d{8}_\d{6}\.mp4$/.test(f))
-        .sort()
-        .reverse();
-
-      console.log("MP4 candidates found:", candidates);
-
-      let latestVideo = candidates.length > 0 ? path.join(__dirname, candidates[0]) : null;
-      console.log("Latest video resolved path:", latestVideo);
-
-      if (latestVideo && fs.existsSync(latestVideo)) {
-        console.log("Sending file:", latestVideo);
-        res.type("video/mp4"); // ✅ Ensure correct Content-Type
-        return res.sendFile(latestVideo, (sendErr) => {
-          if (sendErr) console.error("sendFile error:", sendErr);
-          else console.log("sendFile completed successfully.");
+      
+      if (latestVideoPath && fs.existsSync(latestVideoPath)) {
+        console.log("Video found in root. Sending file:", latestVideoPath);
+        res.type("video/mp4");
+        // Return here to ensure the request is closed.
+        return res.sendFile(latestVideoPath, (err) => {
+          if (err) {
+            console.error("Error sending file:", err);
+          } else {
+            console.log("File sent successfully.");
+            // Optional: You could clean up the video file after sending it.
+            // fs.unlinkSync(latestVideoPath);
+          }
         });
       }
 
-      // Fallback: search in media directory recursively
-      const mediaDir = path.join(__dirname, "media");
-      try {
-        console.log("Searching fallback media directory:", mediaDir);
-        const walk = (dir) => {
-          const out = [];
-          if (!fs.existsSync(dir)) return out;
-          for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-            const p = path.join(dir, entry.name);
-            if (entry.isDirectory()) out.push(...walk(p));
-            else out.push(p);
-          }
-          return out;
-        };
-        const all = walk(mediaDir);
-        const mp4s = all
-          .filter((p) => /(?:\\|\/)output_\d{8}_\d{6}\.mp4$/.test(p))
-          .sort()
-          .reverse();
-        console.log("Fallback MP4 candidates:", mp4s);
-        if (mp4s.length) {
-          console.log("Sending fallback file:", mp4s[0]);
-          res.type("video/mp4"); // ✅ Ensure correct Content-Type
-          return res.sendFile(mp4s[0]);
-        }
-      } catch (e) {
-        console.error("Fallback media search failed:", e);
-      }
-
-      console.error("Video file not found. Check Python STDOUT for final path.");
-      return res.status(404).send("Video file not found.");
-    } else {
+      // If we reach here, the video was not found in the primary location.
+      // This indicates a problem with the video generation or file moving process.
+      console.error("FATAL: Video file not found after generation.");
+      console.error("Check Python script stdout/stderr logs above to see if Manim failed or saved the file elsewhere.");
+      return res.status(404).json({ error: "Video file was not found after generation process completed." });
+    } 
+    
+    // 3. Handle the code generation success case.
+    else {
+      // The python script finished successfully, send its output.
       return res.json({ result: stdout });
     }
   });
