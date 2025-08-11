@@ -1,90 +1,119 @@
 import subprocess
 import os
-from inference import ask
 import re
-from datetime import datetime
-import traceback
 import sys
+import ast
+import traceback
+from datetime import datetime
+from inference import ask
+
+# Directory of this script
+script_dir = os.path.dirname(__file__)
 
 def extract_code_block(text: str) -> str:
     """
-    Extract the first Python code block from markdown text.
+    Extract the first triple-backtick code block or return text as-is.
+    Handles fenced code blocks with or without language specifiers.
     """
-    code_blocks = re.findall(r"```(?:python)?\s*([\s\S]*?)```", text)
-    if code_blocks:
-        return code_blocks[0].strip()
-    return text.strip()  # faasdasdasdallback: return everything
-
-def is_valid_manim_code(code: str) -> bool:
-    # Simple check: must contain at least one likely code line
-    keywords = ["self.play", "self.wait", "=", "Circle", "Square", "Line", "Create", "FadeIn", "FadeOut"]
-    return any(k in code for k in keywords)
+    m = re.search(r"```(?:python)?\s*([\s\S]*?)```", text)
+    if m:
+        return m.group(1).strip()
+    return text.strip()
 
 def write_manim_script(code: str, script_filename: str):
-    # Indent each line by 8 spaces for correct Python indentation
-    indented_code = "\n".join("        " + line if line.strip() else "" for line in code.splitlines())
+    """
+    Writes the code inside the construct() method of AIAnimation class,
+    indenting properly for Python syntax.
+    """
+    indented_code = "\n".join(("        " + line) if line.strip() else "" for line in code.splitlines())
     script = f"""
 from manim import *
 
 class AIAnimation(Scene):
     def construct(self):
 {indented_code}
-    """
+"""
     with open(script_filename, "w", encoding="utf-8") as f:
         f.write(script)
 
 def extract_construct_body(code: str) -> str:
     """
-    Extract the body of the construct method from a class or function definition.
-    If not found, return the original code.
+    Extract just the body of construct() if it exists.
+    Otherwise returns code as is.
     """
-    import ast
     try:
         tree = ast.parse(code)
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef) and node.name == "construct":
                 lines = [ast.get_source_segment(code, stmt) for stmt in node.body]
-                return "\n".join(lines)
-    except Exception as e:
+                return "\n".join(l for l in lines if l)
+    except Exception:
         pass
     return code
 
-def generate_video(prompt):
-    output_dir = "media/videos"
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+def generate_video(prompt: str):
+    media_dir = os.path.join(script_dir, "media")
+    os.makedirs(media_dir, exist_ok=True)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     script_filename = f"ai_scene_{timestamp}.py"
     output_filename = f"output_{timestamp}.mp4"
 
+    print("[generate_video] Using Python:", sys.executable)
+    print("[generate_video] Output filename:", output_filename)
+
+    # Get raw code from language model
     result = ask(prompt)
     code_inside_construct = extract_code_block(result)
     code_inside_construct = extract_construct_body(code_inside_construct)
 
-    if not is_valid_manim_code(code_inside_construct):
-        print("Error: LLM did not return valid Manim code.")
-        return
+    # Remove any stray markdown fences (triple backticks) and whitespace
+    code_inside_construct = re.sub(r"```+", "", code_inside_construct).strip()
 
+    print("[generate_video] Generated Manim code inside construct():")
+    print(code_inside_construct)
+    print("[generate_video] End of generated code\n")
+
+    # Write the generated python scene script
     write_manim_script(code_inside_construct, script_filename)
 
     try:
-        subprocess.run([
-            "manim", 
-            "-pql",
+        # Run Manim as a module to ensure correct environment usage
+        cmd = [
+            sys.executable, "-m", "manim",
+            "-ql",  # Low quality video output
             script_filename,
             "AIAnimation",
+            "--media_dir", media_dir,
             "--output_file", output_filename
-        ], check=True)
-        src = f"media/videos/ai_scene/{timestamp}/480p15/{output_filename}"
-        if os.path.exists(src):
-            os.rename(src, output_filename)
-        print(f"Video generated: {output_filename}")
+        ]
+        print("[generate_video] Running command:", " ".join(cmd))
+        completed = subprocess.run(cmd, check=True, capture_output=True, text=True, cwd=script_dir)
+
+        print("--- MANIM STDOUT ---")
+        print(completed.stdout)
+        print("--- MANIM STDERR ---")
+        print(completed.stderr)
+
+        # Recursively find the generated video file
+        generated_video_path = None
+        for root, dirs, files in os.walk(media_dir):
+            if output_filename in files:
+                generated_video_path = os.path.join(root, output_filename)
+                break
+
+        if generated_video_path and os.path.exists(generated_video_path):
+            final_path = os.path.join(script_dir, output_filename)
+            os.replace(generated_video_path, final_path)
+            print(f"Video generated and moved to: {final_path}")
+        else:
+            print("[generate_video] ERROR: Video file not found after Manim run.")
+
     except subprocess.CalledProcessError as e:
-        print("Error running Manim:", e)
+        print("[generate_video] Manim error encountered:\n", e.stdout, "\n", e.stderr)
         traceback.print_exc()
     except Exception as e:
-        print("Unexpected error:", e)
+        print("[generate_video] Unexpected error:", e)
         traceback.print_exc()
     finally:
         if os.path.exists(script_filename):
@@ -93,11 +122,7 @@ def generate_video(prompt):
 if __name__ == "__main__":
     print("[generate_video] Script started.")
     if len(sys.argv) > 1:
-        print("[generate_video] Arguments provided:", sys.argv[1:])
         prompt = " ".join(sys.argv[1:])
     else:
-        print("[generate_video] No arguments provided.")
-        print('For best results, describe your animation. The system will prepend:\n'
-              '"Return only the Python code for the body of the construct method, no explanation or markdown."')
         prompt = input("Enter your animation prompt: ")
     generate_video(prompt)
